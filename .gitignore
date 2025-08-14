@@ -13,3 +13,8 @@ CMakeFiles/
 *.make
 *.cc.o
 *.cc.o.d
+
+.idea/
+*.iml
+*.ipr
+*.iws
