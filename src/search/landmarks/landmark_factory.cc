@@ -80,7 +80,7 @@ shared_ptr<LandmarkGraph> LandmarkFactory::compute_lm_graph(
     if (log.is_at_least_debug()) {
         dump_landmark_graph(task_proxy, *lm_graph, log);
     }
-    return lm_graph;
+    return lm_graph;//cache one graph per factory instance
 }
 
 bool LandmarkFactory::is_landmark_precondition(

@@ -52,7 +52,7 @@ protected:
                                   const Landmark &landmark) const;
 
     const std::vector<int> &get_operators_including_eff(const FactPair &eff) const {
-        return operators_eff_lookup[eff.var][eff.value];
+        return operators_eff_lookup[eff.var][eff.value];//operators_eff_lookup is a 3D vector indexed as [var][val]-> list of operator IDs that achieve that fact
     }
 
 private:

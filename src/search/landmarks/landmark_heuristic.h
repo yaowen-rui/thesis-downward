@@ -35,7 +35,7 @@ protected:
 
     void initialize(
         const std::shared_ptr<LandmarkFactory> &lm_factory,
-        bool prog_goal, bool prog_gn, bool prog_r);
+        bool prog_goal, bool prog_gn, bool prog_r);//progress ordering
     void compute_landmark_graph(
         const std::shared_ptr<LandmarkFactory> &lm_factory);
 
