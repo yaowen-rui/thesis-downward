@@ -102,25 +102,35 @@ bool LandmarkGraph::contains_landmark(const FactPair &lm) const {
 }
 
 LandmarkNode &LandmarkGraph::add_landmark(Landmark &&landmark) {
-    assert(landmark.conjunctive
-           || all_of(landmark.facts.begin(), landmark.facts.end(),
-                     [&](const FactPair &lm_fact) {
-                         return !contains_landmark(lm_fact);
-                     }));
+    // assert(landmark.conjunctive
+    //        || all_of(landmark.facts.begin(), landmark.facts.end(),
+    //                  [&](const FactPair &lm_fact) {
+    //                      return !contains_landmark(lm_fact);
+    //                  }));
+    if (landmark.is_fact_based()){
+        assert(landmark.conjunctive
+                || all_of(landmark.facts.begin(), landmark.facts.end(),
+                            [&](const FactPair &lm_fact){
+                                return !contains_landmark(lm_fact);
+                            }));
+    }
     unique_ptr<LandmarkNode> new_node =
         utils::make_unique_ptr<LandmarkNode>(move(landmark));
     LandmarkNode *new_node_p = new_node.get();
     const Landmark &lm = new_node->get_landmark();
     nodes.push_back(move(new_node));
-    if (lm.disjunctive) {
+    //if (lm.disjunctive) {
+    if (lm.is_fact_disj()) {
         for (const FactPair &lm_fact : lm.facts) {
             disjunctive_landmarks_to_nodes.emplace(lm_fact, new_node_p);
         }
         ++num_disjunctive_landmarks;
-    } else if (lm.conjunctive) {
+    } else if (lm.is_fact_conj()) { // else if (lm.conjunctive) { 
         ++num_conjunctive_landmarks;
-    } else {
+    } else if (lm.is_fact_simple()) { //else {}
         simple_landmarks_to_nodes.emplace(lm.facts.front(), new_node_p);
+    } else {
+        //disj action lm,no fact indexing, no counters
     }
     return *new_node_p;
 }
@@ -137,15 +147,17 @@ void LandmarkGraph::remove_node_occurrences(LandmarkNode *node) {
         assert(child_node.parents.find(node) == child_node.parents.end());
     }
     const Landmark &landmark = node->get_landmark();
-    if (landmark.disjunctive) {
+    if (landmark.is_fact_disj()) {//landmark.disjunctive
         --num_disjunctive_landmarks;
         for (const FactPair &lm_fact : landmark.facts) {
             disjunctive_landmarks_to_nodes.erase(lm_fact);
         }
-    } else if (landmark.conjunctive) {
+    } else if (landmark.is_fact_conj()) {//landmark.conjunctive
         --num_conjunctive_landmarks;
-    } else {
+    } else if(landmark.is_fact_simple()){//else
         simple_landmarks_to_nodes.erase(landmark.facts[0]);
+    } else {
+        //action disj lm: nothing to erase from fact indices
     }
 }
 
