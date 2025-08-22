@@ -32,12 +32,6 @@ extern void dump_landmark_graph(
     const LandmarkGraph &graph,
     utils::LogProxy &log);
 
-//dump only action landmarks (nodes) and only action -> action edges
-extern void dump_action_landmark_graph(
-    const TaskProxy &task_proxy,
-    const LandmarkGraph &graph,
-    utils::LogProxy &log);
-
 }
 
 #endif

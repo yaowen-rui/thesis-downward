@@ -156,10 +156,4 @@ void dump_landmark_graph(
     }
 }
 
-void dump_action_landmark_graph(
-    const TaskProxy &task_proxy,
-    const LandmarkGraph &graph,
-    utils::LogProxy &log) {
-//todo
-}
 }
