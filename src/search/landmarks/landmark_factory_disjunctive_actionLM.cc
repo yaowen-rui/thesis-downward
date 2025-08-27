@@ -3,6 +3,7 @@
 
 #include "landmark.h"
 #include "landmark_graph.h"
+#include "landmark_graph_action.h"
 #include "util.h"
 
 #include "../task_proxy.h"
@@ -205,6 +206,7 @@ void LandmarkFactoryDisjunctiveActionLM::found_simple_lm_and_order(
   }
 }
 
+//A disjunctive LM is not added if any of its member facts is true in the initial state
 void LandmarkFactoryDisjunctiveActionLM::found_disj_lm_and_order(
     const TaskProxy &task_proxy, const set<FactPair> &a,
     LandmarkNode &b, EdgeType t) {
@@ -231,7 +233,7 @@ void LandmarkFactoryDisjunctiveActionLM::found_disj_lm_and_order(
     if (lm_graph->contains_identical_disjunctive_landmark(a)) {
       // LM already exists, just add order.
       new_lm_node = &lm_graph->get_disjunctive_landmark(*a.begin());
-      edge_add(*new_lm_node, b, t);
+      edge_add(*new_lm_node, b, t);//b:landmarkNode, t:EdgeType
       return;
     }
     // LM overlaps with existing disj. LM, do not add.
@@ -240,12 +242,36 @@ void LandmarkFactoryDisjunctiveActionLM::found_disj_lm_and_order(
   // This LM and no part of it exist, add the LM to the landmarks graph.
   Landmark landmark(vector<FactPair>(a.begin(), a.end()), true, false);
   new_lm_node = &lm_graph->add_landmark(move(landmark));
+  
+  open_landmarks.push_back(new_lm_node);
+  edge_add(*new_lm_node, b, t);
 
   //attach the disj action view for this newly created disj fact lm
   attach_disj_action_achievers(new_lm_node, a);//only attach on creation, if an identical disj lm already exists, we dont recreate or reattach
-
-  open_landmarks.push_back(new_lm_node);
-  edge_add(*new_lm_node, b, t);
+  //create/reuse a disj action lm node using a single string index
+  if(const auto *ops = get_disj_action_achievers(new_lm_node)){
+    if(!ops->empty()) {
+      const string sig = action_union_signature(*ops);
+      LandmarkNode *action_node = nullptr;
+      auto it = action_nodes_by_sig.find(sig);
+      if(it != action_nodes_by_sig.end()) {
+        action_node = it->second;//reuse existing action lm node
+      } else {
+        //if graph support action nodes, prefer creating a first-class action node
+        if(auto *ag = dynamic_cast<LandmarkGraphAction *>(lm_graph.get())) {
+          LandmarkNode &act = ag->add_action_landmark(*ops);
+          action_node = &act;
+        } 
+        if(action_node) {
+          action_nodes_by_sig.emplace(sig, action_node);
+        }
+      }
+      if(action_node) {
+        //edge direction: action -> disj fact
+        edge_add(*action_node, *new_lm_node, EdgeType::GREEDY_NECESSARY);
+      }
+    }
+  }
 }
 
 void LandmarkFactoryDisjunctiveActionLM::compute_shared_preconditions(
@@ -410,6 +436,7 @@ void LandmarkFactoryDisjunctiveActionLM::generate_relaxed_landmarks(
   build_dtg_successors(task_proxy);
   build_disjunction_classes(task_proxy);
 
+  //iterate over all goals, make each goal a landmark and put it into the open list
   for (FactProxy goal : task_proxy.get_goals()) {
     Landmark landmark({goal.get_pair()}, false, false, true);
     LandmarkNode &lm_node = lm_graph->add_landmark(move(landmark));
@@ -653,8 +680,8 @@ vector<int> LandmarkFactoryDisjunctiveActionLM::to_sorted_vector(std::unordered_
   return out;
 }
 
-string LandmarkFactoryDisjunctiveActionLM::unionOp_signature(const vector<int> &ops) {
-  //ops are already sorted by to_sorted_vector, join with commas
+string LandmarkFactoryDisjunctiveActionLM::action_union_signature(const vector<int> &ops) {
+  //ops are already sorted by to_sorted_vector, join with commas, ops expected sorted and unique
   string sig;
   sig.reserve(ops.size()*3);
   for (size_t i=0; i < ops.size();++i) {
@@ -663,8 +690,8 @@ string LandmarkFactoryDisjunctiveActionLM::unionOp_signature(const vector<int> &
   }
   return sig;
 }
-LandmarkNode *LandmarkFactoryDisjunctiveActionLM::ensure_disj_action_for_factLm(
-  const LandmarkNode *disj_fact_node) {
+/* LandmarkNode *LandmarkFactoryDisjunctiveActionLM::ensure_disj_action_for_factLm(
+  const LandmarkNode *disj_fact_node) { 
   const vector<int> *ops = get_disj_action_achievers(disj_fact_node);
   if(!ops || ops->empty()) {
     return nullptr;
@@ -693,7 +720,7 @@ LandmarkNode *LandmarkFactoryDisjunctiveActionLM::ensure_disj_action_for_factLm(
   edge_add(an, *const_cast<LandmarkNode *>(disj_fact_node), EdgeType::GREEDY_NECESSARY);
   return &an;
 
-}
+}*/
 
 //given the newly created disj fact lm node and the set of its atoms, loops over each atom in the disjunction,
 // unions those operator IDs, stores the vector in disj_action_achievers[node]

@@ -64,6 +64,7 @@ public:
 
 class LandmarkGraph {
 public:
+    virtual ~LandmarkGraph() = default;//new for action landmark graph, make base polymorphic for dynamic_cast
     /*
       TODO: get rid of this by removing get_nodes() and instead offering
       functions begin() and end() with an iterator class, so users of the

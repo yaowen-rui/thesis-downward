@@ -19,7 +19,7 @@ class LandmarkSumHeuristicDal : public LandmarkHeuristic {
   std::vector<int> min_possible_achiever_costs;
 
   //if the factory is LandmarkFactoryDisjunctiveActionLM, keep a pointer to use its side map(here stores the disj action landmarks)
-  const LandmarkFactoryDisjunctiveActionLM *dal_factory= nullptr;
+  const LandmarkFactoryDisjunctiveActionLM *dal_factory= nullptr;//TODO, let dal_factory be able to be invoked in constructor as parameter 
 
   int get_min_cost_of_achievers(
       const std::unordered_set<int> &achievers) const;

@@ -27,9 +27,8 @@ class LandmarkFactoryDisjunctiveActionLM : public LandmarkFactoryRelaxation {
   /*Disjunctive action landmark: For each disjunctive fact landmark node, we store the union of operator IDs that
    * can achieve any member atom of that disjunction */
   std::unordered_map<const LandmarkNode *, std::vector<int>> disj_action_achievers;
-  //local index for action landmarks
-  std::unordered_map<std::string, LandmarkNode *> disj_action_index;
-  std::unordered_map<int, LandmarkNode *> single_action_index;
+  //single index for disj action landmarks keyed by e.g. "1,7,12" signature
+  std::unordered_map<std::string, LandmarkNode *> action_nodes_by_sig;
 
   void build_dtg_successors(const TaskProxy &task_proxy);
   void add_dtg_successor(int var_id, int pre, int post);
@@ -42,10 +41,16 @@ class LandmarkFactoryDisjunctiveActionLM : public LandmarkFactoryRelaxation {
       const TaskProxy &task_proxy, const Landmark &landmark,
       const OperatorProxy &op,
       std::unordered_map<int, int> &result) const;
+
+  //if all achievers of a landmark share the same single fact as a precondition, 
+  //that fact is promoted as a simple landmark.   
   void compute_shared_preconditions(
       const TaskProxy &task_proxy,
       std::unordered_map<int, int> &shared_pre,
       std::vector<std::vector<bool>> &reached, const Landmark &landmark);
+  //if achievers don’t share the exact same fact, but each achiever 
+  //contributes one fact from the same disjunction class (same predicate), 
+  //then the union of those facts is created as a disjunctive landmark.
   void compute_disjunctive_preconditions(
       const TaskProxy &task_proxy,
       std::vector<std::set<FactPair>> &disjunctive_pre,
@@ -95,16 +100,14 @@ private:
 
   //convert an unordered set of operator IDs into a sorted
   static std::vector<int> to_sorted_vector(std::unordered_set<int> &&s);
-  //create or reuse an DISJ_ACTION node for a disj fact landmark node
-  LandmarkNode *ensure_disj_action_for_factLm(const LandmarkNode *disj_fact_node);
 
   /* build a stable key like "3,9,12" for indexing operatior sets: 
-  * unionOp_signature(ops) takes the union of achiever operator IDs for a single disjunctive fact LM node, 
+  * action_union_signature(ops) takes the union of achiever operator IDs for a single disjunctive fact LM node, 
   *sorts and de-duplicate them, then joins them with commas to make one stable string key.
   Same op-set -> same signature -> reuse the same action-LM node across multiple fact LMs.
   Different op-sets -> different signatures -> distinct action-LM nodes.
   */
-  static std::string unionOp_signature(const std::vector<int> &ops);
+  static std::string action_union_signature(const std::vector<int> &ops);
 };
 }
 

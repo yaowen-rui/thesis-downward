@@ -111,6 +111,7 @@ int LandmarkSumHeuristicDal::get_heuristic_value(const State &ancestor_state) {
   int h = 0;
   ConstBitsetView past =
       lm_status_manager->get_past_landmarks(ancestor_state);
+      //future:which landmark nodes still need to be achieved. Heuristic sums costs only over future landmarks.
   ConstBitsetView future =
       lm_status_manager->get_future_landmarks(ancestor_state);
   for (int id = 0; id < lm_graph->get_num_landmarks(); ++id) {
@@ -119,7 +120,7 @@ int LandmarkSumHeuristicDal::get_heuristic_value(const State &ancestor_state) {
       int min_achiever_cost;
       const LandmarkNode *lmNode = lm_graph->get_node(id);
       const Landmark &lm = lmNode->get_landmark();
-      if (dal_factory && lm.disjunctive) {
+      if (dal_factory) {//传参方式不对，应该在构造器里传参
         //use disj action lm directly (union of achievers)
         const vector<int> *ops = dal_factory->get_disj_action_achievers(lmNode);
         if(ops && !ops->empty()) {
