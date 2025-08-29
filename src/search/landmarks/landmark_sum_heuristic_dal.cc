@@ -4,6 +4,7 @@
 #include "landmark.h"
 #include "landmark_factory.h"
 #include "landmark_status_manager.h"
+#include "landmark_status_manager_action.h"
 #include "util.h"
 #include "landmark_factory_disjunctive_actionLM.h" //to dynamic cast and access side-map
 
@@ -93,15 +94,23 @@ void LandmarkSumHeuristicDal::compute_landmark_costs() {
   min_first_achiever_costs.reserve(lm_graph->get_num_landmarks());
   min_possible_achiever_costs.reserve(lm_graph->get_num_landmarks());
   for (auto &node : lm_graph->get_nodes()) {
-    if (node->get_landmark().is_derived) {
+    const Landmark &lm = node->get_landmark();
+    //new: cost action landmarks directly from their operator IDs
+    if(lm.type == LandmarkType::DISJ_ACTION) {
+      int min_cost = std::numeric_limits<int>::max();
+      for (int id: lm.action_ids) {
+        OperatorProxy op = get_operator_or_axiom(task_proxy, id);
+        min_cost = std::min(min_cost, op.get_cost());
+      }
+      min_first_achiever_costs.push_back(min_cost);
+      min_possible_achiever_costs.push_back(min_cost);
+    } else if (node->get_landmark().is_derived) {
       min_first_achiever_costs.push_back(min_operator_cost);
       min_possible_achiever_costs.push_back(min_operator_cost);
     } else {
-      int min_first_achiever_cost = get_min_cost_of_achievers(
-          node->get_landmark().first_achievers);
+      int min_first_achiever_cost = get_min_cost_of_achievers(lm.first_achievers);
       min_first_achiever_costs.push_back(min_first_achiever_cost);
-      int min_possible_achiever_cost = get_min_cost_of_achievers(
-          node->get_landmark().possible_achievers);
+      int min_possible_achiever_cost = get_min_cost_of_achievers(lm.possible_achievers);
       min_possible_achiever_costs.push_back(min_possible_achiever_cost);
     }
   }
@@ -116,25 +125,26 @@ int LandmarkSumHeuristicDal::get_heuristic_value(const State &ancestor_state) {
       lm_status_manager->get_future_landmarks(ancestor_state);
   for (int id = 0; id < lm_graph->get_num_landmarks(); ++id) {
     if (future.test(id)) {
-      //int min_achiever_cost = past.test(id) ? min_possible_achiever_costs[id] : min_first_achiever_costs[id];
-      int min_achiever_cost;
-      const LandmarkNode *lmNode = lm_graph->get_node(id);
-      const Landmark &lm = lmNode->get_landmark();
-      if (dal_factory) {//传参方式不对，应该在构造器里传参
-        //use disj action lm directly (union of achievers)
-        const vector<int> *ops = dal_factory->get_disj_action_achievers(lmNode);
-        if(ops && !ops->empty()) {
-          min_achiever_cost = get_min_cost_of_achievers(*ops);
-        }
-      } else {
-        //atomic or unknown factory, keep original behavior
-        min_achiever_cost = past.test(id) ? min_possible_achiever_costs[id] : min_first_achiever_costs[id];
-      }
-
+      int min_achiever_cost = past.test(id) ? min_possible_achiever_costs[id] : min_first_achiever_costs[id];
       if (min_achiever_cost < numeric_limits<int>::max()) {
         h += min_achiever_cost;
       } else {
-        return DEAD_END;
+         return DEAD_END;
+      }
+    }
+  }
+  //new: also sum action-landmark costs directly
+  if(auto *sma = dynamic_cast<LandmarkStatusManagerAction *>(lm_status_manager.get())) {
+    ConstBitsetView pastA   = sma->get_past_action_landmarks(ancestor_state);
+    ConstBitsetView futureA = sma->get_future_action_landmarks(ancestor_state);
+    for (int id = 0; id < lm_graph->get_num_landmarks(); ++id) {
+      if (futureA.test(id)) {
+        int c = pastA.test(id) ? min_possible_achiever_costs[id]
+                               : min_first_achiever_costs[id];
+        if (c < std::numeric_limits<int>::max())
+          h += c;
+        else
+          return DEAD_END;
       }
     }
   }

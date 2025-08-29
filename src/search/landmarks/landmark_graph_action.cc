@@ -9,7 +9,7 @@ LandmarkNode &LandmarkGraphAction::add_action_landmark(std::vector<int> ops) {
     ops.erase(std::unique(ops.begin(), ops.end()), ops.end());
 
     Landmark lm = Landmark::make_disj_action(std::move(ops));
-    LandmarkNode &node = LandmarkGraph::add_landmark(std::move(lm));
+    LandmarkNode &node = LandmarkGraph::add_landmark(std::move(lm));//should update LandmarkGraph::add_landmark
     return node;
 }
 

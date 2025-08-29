@@ -157,15 +157,7 @@ void LandmarkFactoryDisjunctiveActionLM::found_simple_lm_and_order(
 
   Landmark landmark({a}, false, false);
   if (lm_graph->contains_disjunctive_landmark(a)) {
-    // In issue1004, we fixed a bug in this part of the code. It now removes
-    // the disjunctive landmark along with all its orderings from the
-    // landmark graph and adds a new simple landmark node. Before this
-    // change, incoming orderings were maintained, which is not always
-    // correct for greedy necessary orderings. We now replace those
-    // incoming orderings with natural orderings.
-
-    // Simple landmarks are more informative than disjunctive ones,
-    // remove disj. landmark and add simple one
+    // In issue1004
     LandmarkNode *disj_lm = &lm_graph->get_disjunctive_landmark(a);
 
     // Remove all pointers to disj_lm from internal data structures (i.e.,
@@ -177,7 +169,7 @@ void LandmarkFactoryDisjunctiveActionLM::found_simple_lm_and_order(
     forward_orders.erase(disj_lm);
 
     //also remove any attached disj action view
-    disj_action_achievers.erase(disj_lm);
+    action_achievers.erase(disj_lm);
 
     // Retrieve incoming edges from disj_lm
     vector<LandmarkNode *> predecessors;
@@ -199,11 +191,50 @@ void LandmarkFactoryDisjunctiveActionLM::found_simple_lm_and_order(
     for (LandmarkNode *pred : predecessors) {
       edge_add(*pred, simple_lm, EdgeType::NATURAL);
     }
+
+    attach_action_achievers(&simple_lm,a);
+    ensure_action_for_factLm(&simple_lm);
   } else {
     LandmarkNode &simple_lm = lm_graph->add_landmark(move(landmark));
     open_landmarks.push_back(&simple_lm);
     edge_add(simple_lm, b, t);
+
+    attach_action_achievers(&simple_lm,a);
+    ensure_action_for_factLm(&simple_lm);
   }
+  
+}
+
+void LandmarkFactoryDisjunctiveActionLM::sweep_action_nodes() {
+  using landmarks::LandmarkGraphAction;
+  //collect orphan action nodes(no children left==all their outgoing edges went to the now-deleted disjunctive facts)
+  std::vector<LandmarkNode *> to_remove;
+  to_remove.reserve(lm_graph->get_num_landmarks());
+  for(auto &up: lm_graph->get_nodes()) {
+    LandmarkNode *n = up.get();
+    if(LandmarkGraphAction::is_action_node(n) && n->children.empty()) {
+      to_remove.push_back(n);
+    }
+  }
+  if(to_remove.empty()) return;
+
+  //remove them from the action graph
+  std::unordered_set<LandmarkNode*> removed;
+  removed.reserve(to_remove.size());
+  for(LandmarkNode *n: to_remove) {
+    lm_graph->remove_node(n);
+  }
+  //clean action_nodes_by_sig that point to deleted nodes
+  for (auto it = action_nodes_by_sig.begin(); it != action_nodes_by_sig.end(); ) {
+    if (removed.count(it->second)) {
+      it = action_nodes_by_sig.erase(it);
+    } else {
+      ++it;
+    }
+  }
+  //rebuild ids after remove
+  lm_graph->set_landmark_ids();
+
 }
 
 //A disjunctive LM is not added if any of its member facts is true in the initial state
@@ -248,30 +279,8 @@ void LandmarkFactoryDisjunctiveActionLM::found_disj_lm_and_order(
 
   //attach the disj action view for this newly created disj fact lm
   attach_disj_action_achievers(new_lm_node, a);//only attach on creation, if an identical disj lm already exists, we dont recreate or reattach
-  //create/reuse a disj action lm node using a single string index
-  if(const auto *ops = get_disj_action_achievers(new_lm_node)){
-    if(!ops->empty()) {
-      const string sig = action_union_signature(*ops);
-      LandmarkNode *action_node = nullptr;
-      auto it = action_nodes_by_sig.find(sig);
-      if(it != action_nodes_by_sig.end()) {
-        action_node = it->second;//reuse existing action lm node
-      } else {
-        //if graph support action nodes, prefer creating a first-class action node
-        if(auto *ag = dynamic_cast<LandmarkGraphAction *>(lm_graph.get())) {
-          LandmarkNode &act = ag->add_action_landmark(*ops);
-          action_node = &act;
-        } 
-        if(action_node) {
-          action_nodes_by_sig.emplace(sig, action_node);
-        }
-      }
-      if(action_node) {
-        //edge direction: action -> disj fact
-        edge_add(*action_node, *new_lm_node, EdgeType::GREEDY_NECESSARY);
-      }
-    }
-  }
+  
+  ensure_action_for_factLm(new_lm_node);
 }
 
 void LandmarkFactoryDisjunctiveActionLM::compute_shared_preconditions(
@@ -664,7 +673,9 @@ void LandmarkFactoryDisjunctiveActionLM::discard_disjunctive_landmarks() {
     lm_graph->remove_node_if(
         [](const LandmarkNode &node) {return node.get_landmark().disjunctive;});
     //All disj nodes are gone, drop attached action views
-    disj_action_achievers.clear();
+    action_achievers.clear();
+    //remove action lm nodes + clean node signature 
+    sweep_action_nodes();
   }
 }
 
@@ -690,37 +701,42 @@ string LandmarkFactoryDisjunctiveActionLM::action_union_signature(const vector<i
   }
   return sig;
 }
-/* LandmarkNode *LandmarkFactoryDisjunctiveActionLM::ensure_disj_action_for_factLm(
-  const LandmarkNode *disj_fact_node) { 
-  const vector<int> *ops = get_disj_action_achievers(disj_fact_node);
-  if(!ops || ops->empty()) {
-    return nullptr;
-  }
-  //reuse if we already built this set
-  if (ops->size() == 1) {
-    int op = (*ops)[0];
-    auto it = single_action_index.find(op);
-    if (it != single_action_index.end())
-      return it->second;
-  }
-  const string sig = unionOp_signature(*ops);
-  auto it2 = disj_action_index.find(sig);
-  if (it2 != disj_action_index.end()) {
-    return it2->second;
-  }
-  //create a new ACTION_DISJ landmark node, requires Landmark::make_action_disjunctive in landmark.h.
-  Landmark action_lm = Landmark::make_action_disjunctive(*ops);
-  LandmarkNode &an = lm_graph->add_landmark(std::move(action_lm));
 
-  // Index it (optional but handy).
-  if (ops->size() == 1) single_action_index[(*ops)[0]] = &an;
-  disj_action_index[sig] = &an;
 
-  // Edge: action landmark is a greedy-necessary predecessor of the fact disjunction it supports.
-  edge_add(an, *const_cast<LandmarkNode *>(disj_fact_node), EdgeType::GREEDY_NECESSARY);
-  return &an;
 
-}*/
+LandmarkNode *LandmarkFactoryDisjunctiveActionLM::ensure_action_for_factLm(
+  const LandmarkNode *fact_node) { 
+
+  if(const auto *ops = get_action_achievers(fact_node)){
+    if(!ops->empty()) {
+      const string sig = action_union_signature(*ops);
+      LandmarkNode *action_node = nullptr;
+      auto it = action_nodes_by_sig.find(sig);
+      if(it != action_nodes_by_sig.end()) {
+        action_node = it->second;//reuse existing action lm node
+      } else {
+        //if graph support action nodes, prefer creating a first-class action node
+        if(auto *ag = dynamic_cast<LandmarkGraphAction *>(lm_graph.get())) {
+          LandmarkNode &act = ag->add_action_landmark(*ops);//performs no fact-indexing for action nodes).
+          action_node = &act;
+        } 
+        if(action_node) {
+          action_nodes_by_sig.emplace(sig, action_node);
+        }
+      }
+      if(action_node) {
+        //wire action -> fact as a greedy-necessary predecessor edge
+        if(fact_node->get_landmark().disjunctive) {
+          edge_add(*action_node, *const_cast<LandmarkNode *>(fact_node), EdgeType::GREEDY_NECESSARY);
+        } else {
+          edge_add(*action_node, *const_cast<LandmarkNode *>(fact_node), EdgeType::NATURAL);
+        }
+        
+      }
+    }
+  }
+
+} 
 
 //given the newly created disj fact lm node and the set of its atoms, loops over each atom in the disjunction,
 // unions those operator IDs, stores the vector in disj_action_achievers[node]
@@ -740,7 +756,18 @@ void LandmarkFactoryDisjunctiveActionLM::attach_disj_action_achievers(
     const vector<int> &ops = get_operators_including_eff(atom);
     op_union.insert(ops.begin(), ops.end());
   }
-  disj_action_achievers[lm_node] = to_sorted_vector(std::move(op_union));
+  action_achievers[lm_node] = to_sorted_vector(std::move(op_union));
+}
+
+void LandmarkFactoryDisjunctiveActionLM::attach_action_achievers(
+  LandmarkNode *lm_node, const FactPair &atom) {
+    if(!lm_node) return;
+    const Landmark &lm = lm_node->get_landmark();
+    if(lm.disjunctive || lm.conjunctive) return;
+
+    const vector<int> &ops = get_operators_including_eff(atom);
+    std::unordered_set<int> uniq(ops.begin(), ops.end());
+    action_achievers[lm_node] = to_sorted_vector(std::move(uniq));
 }
 
 class LandmarkFactoryDisjunctiveActionLMFeature

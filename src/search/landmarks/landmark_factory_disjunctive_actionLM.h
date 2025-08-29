@@ -24,11 +24,14 @@ class LandmarkFactoryDisjunctiveActionLM : public LandmarkFactoryRelaxation {
   // domain transition graph for the variable
   std::vector<std::vector<std::unordered_set<int>>> dtg_successors;
 
-  /*Disjunctive action landmark: For each disjunctive fact landmark node, we store the union of operator IDs that
-   * can achieve any member atom of that disjunction */
-  std::unordered_map<const LandmarkNode *, std::vector<int>> disj_action_achievers;
+  /*Disjunctive action landmark: For each fact landmark node, we store the union of operator IDs that
+   * can achieve any member atom of that disjunction, we also store the achievers of simple fact lm */
+  std::unordered_map<const LandmarkNode *, std::vector<int>> action_achievers;
   //single index for disj action landmarks keyed by e.g. "1,7,12" signature
   std::unordered_map<std::string, LandmarkNode *> action_nodes_by_sig;
+  //local index for action landmarks
+  //std::unordered_map<std::string, LandmarkNode *> disj_action_index;
+  //std::unordered_map<int, LandmarkNode *> single_action_index;
 
   void build_dtg_successors(const TaskProxy &task_proxy);
   void add_dtg_successor(int var_id, int pre, int post);
@@ -87,20 +90,26 @@ public:
   virtual bool supports_conditional_effects() const override;
 
   //return nullptr if the nodes has no stored action achievers;
-  const std::vector<int> *get_disj_action_achievers(
+  const std::vector<int> *get_action_achievers(
       const LandmarkNode *node) const {
-      auto it = disj_action_achievers.find(node);
-      return (it==disj_action_achievers.end())? nullptr : &it->second;
+      auto it = action_achievers.find(node);
+      return (it==action_achievers.end())? nullptr : &it->second;
   };
 
 private:
   //compute and attach L^a = union of achievers for all atoms in a disjunctive fact landmark
   void attach_disj_action_achievers (LandmarkNode *lm_node,
                                     const std::set<FactPair> &atoms);
+  //compute and attach ahievers for a simple fact landmark
+  void attach_action_achievers(LandmarkNode *lm_node, const FactPair &a);
 
   //convert an unordered set of operator IDs into a sorted
   static std::vector<int> to_sorted_vector(std::unordered_set<int> &&s);
 
+  //create or reuse an ACTION node for a disj fact landmark node
+  LandmarkNode *ensure_action_for_factLm(const LandmarkNode *fact_node);
+
+  void sweep_action_nodes();
   /* build a stable key like "3,9,12" for indexing operatior sets: 
   * action_union_signature(ops) takes the union of achiever operator IDs for a single disjunctive fact LM node, 
   *sorts and de-duplicate them, then joins them with commas to make one stable string key.
