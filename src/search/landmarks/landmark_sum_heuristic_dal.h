@@ -18,15 +18,14 @@ class LandmarkSumHeuristicDal : public LandmarkHeuristic {
   std::vector<int> min_first_achiever_costs;
   std::vector<int> min_possible_achiever_costs;
 
-  //if the factory is LandmarkFactoryDisjunctiveActionLM, keep a pointer to use its side map(here stores the disj action landmarks)
-  const LandmarkFactoryDisjunctiveActionLM *dal_factory= nullptr;//TODO, let dal_factory be able to be invoked in constructor as parameter 
+  //for action layer
+  std::vector<int> min_action_costs;// precompute min operator cost for each ACTION node id
+  std::vector<unsigned char> is_action_node;//for each node id: 1 if it's an action lm, else 0
+  bool use_action_layer = false;//true iff graph contains any action lm nodes
+  int get_min_cost_of_achievers(const std::vector<int> &op_ids);
 
   int get_min_cost_of_achievers(
       const std::unordered_set<int> &achievers) const;
-
-  //get min cost of action from disj action landmark
-  int get_min_cost_of_achievers(
-      const std::vector<int> &achievers) const;
 
   void compute_landmark_costs();
 
@@ -43,4 +42,4 @@ public:
 };
 }
 
-#endif // FAST_DOWNWARD_LANDMARK_SUM_HEURISTIC_DAL_H
+#endif 

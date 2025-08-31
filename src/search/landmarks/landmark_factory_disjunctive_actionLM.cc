@@ -442,6 +442,10 @@ void LandmarkFactoryDisjunctiveActionLM::generate_relaxed_landmarks(
   if (log.is_at_least_normal()) {
     log << "Generating landmarks using the RPG/SAS+ approach" << endl;
   }
+  //ensure lm_graph is action-aware before we add nodes.
+  if(!dynamic_cast<LandmarkGraphAction *>(lm_graph.get())) {
+    lm_graph = utils::make_unique_ptr<LandmarkGraphAction>();
+  }
   build_dtg_successors(task_proxy);
   build_disjunction_classes(task_proxy);
 
@@ -706,7 +710,6 @@ string LandmarkFactoryDisjunctiveActionLM::action_union_signature(const vector<i
 
 LandmarkNode *LandmarkFactoryDisjunctiveActionLM::ensure_action_for_factLm(
   const LandmarkNode *fact_node) { 
-
   if(const auto *ops = get_action_achievers(fact_node)){
     if(!ops->empty()) {
       const string sig = action_union_signature(*ops);
@@ -725,7 +728,7 @@ LandmarkNode *LandmarkFactoryDisjunctiveActionLM::ensure_action_for_factLm(
         }
       }
       if(action_node) {
-        //wire action -> fact as a greedy-necessary predecessor edge
+        //wire action -> fact as a greedy-necessary/natural predecessor edge
         if(fact_node->get_landmark().disjunctive) {
           edge_add(*action_node, *const_cast<LandmarkNode *>(fact_node), EdgeType::GREEDY_NECESSARY);
         } else {

@@ -27,11 +27,10 @@ class LandmarkFactoryDisjunctiveActionLM : public LandmarkFactoryRelaxation {
   /*Disjunctive action landmark: For each fact landmark node, we store the union of operator IDs that
    * can achieve any member atom of that disjunction, we also store the achievers of simple fact lm */
   std::unordered_map<const LandmarkNode *, std::vector<int>> action_achievers;
-  //single index for disj action landmarks keyed by e.g. "1,7,12" signature
+
+  //single index for disj action landmarks keyed by e.g. "1,7,12" signature, 
+  //so multiple fact LMs that have the same achiever set share the same action LM node
   std::unordered_map<std::string, LandmarkNode *> action_nodes_by_sig;
-  //local index for action landmarks
-  //std::unordered_map<std::string, LandmarkNode *> disj_action_index;
-  //std::unordered_map<int, LandmarkNode *> single_action_index;
 
   void build_dtg_successors(const TaskProxy &task_proxy);
   void add_dtg_successor(int var_id, int pre, int post);
@@ -106,7 +105,7 @@ private:
   //convert an unordered set of operator IDs into a sorted
   static std::vector<int> to_sorted_vector(std::unordered_set<int> &&s);
 
-  //create or reuse an ACTION node for a disj fact landmark node
+  //create or reuse an ACTION node for a fact landmark node
   LandmarkNode *ensure_action_for_factLm(const LandmarkNode *fact_node);
 
   void sweep_action_nodes();

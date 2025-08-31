@@ -5,6 +5,7 @@
 #include "landmark_factory.h"
 #include "landmark_status_manager.h"
 #include "landmark_status_manager_action.h"
+#include "landmark_graph_action.h"
 #include "util.h"
 #include "landmark_factory_disjunctive_actionLM.h" //to dynamic cast and access side-map
 
@@ -49,11 +50,22 @@ LandmarkSumHeuristicDal::LandmarkSumHeuristicDal(
     log << "Initializing landmark sum heuristic..." << endl;
   }
 
-  dal_factory = dynamic_cast<const LandmarkFactoryDisjunctiveActionLM *>(lm_factory.get());
+  //dal_factory = dynamic_cast<const LandmarkFactoryDisjunctiveActionLM *>(lm_factory.get());
 
   initialize(lm_factory, prog_goal, prog_gn, prog_r);
   compute_landmark_costs();
 }
+
+//new: min cost over a list of operators/achievers
+int LandmarkSumHeuristicDal::get_min_cost_of_achievers(const std::vector<int> &op_ids) {
+  int min_cost = numeric_limits<int>::max();
+  for (int id : op_ids) {
+    OperatorProxy op = get_operator_or_axiom(task_proxy, id);
+    min_cost = min(min_cost, op.get_cost());
+  }
+  return min_cost;
+}
+ 
 
 int LandmarkSumHeuristicDal::get_min_cost_of_achievers(
     const unordered_set<int> &achievers) const {
@@ -65,16 +77,7 @@ int LandmarkSumHeuristicDal::get_min_cost_of_achievers(
   return min_cost;
 }
 
-//new added for disj action lm
-int LandmarkSumHeuristicDal::get_min_cost_of_achievers(
-    const std::vector<int> &achievers) const {
-  int min_cost = numeric_limits<int>::max();
-  for(int id: achievers) {
-    OperatorProxy op = get_operator_or_axiom(task_proxy, id);
-    min_cost = min(min_cost, op.get_cost());
-  }
-  return min_cost;
-}
+
 
 void LandmarkSumHeuristicDal::compute_landmark_costs() {
   /*
@@ -90,21 +93,32 @@ void LandmarkSumHeuristicDal::compute_landmark_costs() {
     in the achiever vector, we instead just compute the minimum cost
     over all operators and use this cost for all derived landmarks.
   */
+  const int N = lm_graph->get_num_landmarks();
+  is_action_node.assign(N,0);
+  min_action_costs.assign(N, numeric_limits<int>::max());
+  use_action_layer = false;
+  //detect action node and recompute their min operator costs
+  //Since fact and action landmarks live in the same lm_graph->get_nodes() container, 
+  //the heuristic must scan the nodes and detect action landmarks.
+  int idx = 0;
+  for (auto &up : lm_graph->get_nodes()) {
+    const LandmarkNode *n = up.get();
+    const bool is_action = LandmarkGraphAction::is_action_node(n);
+    is_action_node[idx] = is_action? 1:0;
+    if (is_action) {
+      use_action_layer = true;
+      const Landmark &lm = n->get_landmark();
+      min_action_costs[idx] = get_min_cost_of_achievers(lm.action_ids);
+    }
+    ++idx;
+  }
+
   int min_operator_cost = task_properties::get_min_operator_cost(task_proxy);
-  min_first_achiever_costs.reserve(lm_graph->get_num_landmarks());
-  min_possible_achiever_costs.reserve(lm_graph->get_num_landmarks());
+  min_first_achiever_costs.reserve(N);//reserve(lm_graph->get_num_landmarks());
+  min_possible_achiever_costs.reserve(N);
   for (auto &node : lm_graph->get_nodes()) {
     const Landmark &lm = node->get_landmark();
-    //new: cost action landmarks directly from their operator IDs
-    if(lm.type == LandmarkType::DISJ_ACTION) {
-      int min_cost = std::numeric_limits<int>::max();
-      for (int id: lm.action_ids) {
-        OperatorProxy op = get_operator_or_axiom(task_proxy, id);
-        min_cost = std::min(min_cost, op.get_cost());
-      }
-      min_first_achiever_costs.push_back(min_cost);
-      min_possible_achiever_costs.push_back(min_cost);
-    } else if (node->get_landmark().is_derived) {
+    if (node->get_landmark().is_derived) {
       min_first_achiever_costs.push_back(min_operator_cost);
       min_possible_achiever_costs.push_back(min_operator_cost);
     } else {
@@ -117,6 +131,26 @@ void LandmarkSumHeuristicDal::compute_landmark_costs() {
 }
 
 int LandmarkSumHeuristicDal::get_heuristic_value(const State &ancestor_state) {
+  //if we have an action layer, sum over action LMs that are future
+  if(use_action_layer) {
+    if(auto *lsma = dynamic_cast<LandmarkStatusManagerAction *>(lm_status_manager.get())) {
+      int h = 0;
+      ConstBitsetView futureA = lsma->get_future_action_landmarks(ancestor_state);
+      const int N = lm_graph->get_num_landmarks();
+      for (int id=0; id<N; ++id) {
+        if(!is_action_node[id]) continue;
+        if(futureA.test(id)) {
+          const int c = min_action_costs[id];
+          if(c == numeric_limits<int>::max()) {
+            return DEAD_END;//no achievers => dead end
+          }
+          h += c;
+        }
+      }
+      return h;
+    }
+  }
+  //orginal fact-based behavior
   int h = 0;
   ConstBitsetView past =
       lm_status_manager->get_past_landmarks(ancestor_state);
@@ -133,21 +167,6 @@ int LandmarkSumHeuristicDal::get_heuristic_value(const State &ancestor_state) {
       }
     }
   }
-  //new: also sum action-landmark costs directly
-  if(auto *sma = dynamic_cast<LandmarkStatusManagerAction *>(lm_status_manager.get())) {
-    ConstBitsetView pastA   = sma->get_past_action_landmarks(ancestor_state);
-    ConstBitsetView futureA = sma->get_future_action_landmarks(ancestor_state);
-    for (int id = 0; id < lm_graph->get_num_landmarks(); ++id) {
-      if (futureA.test(id)) {
-        int c = pastA.test(id) ? min_possible_achiever_costs[id]
-                               : min_first_achiever_costs[id];
-        if (c < std::numeric_limits<int>::max())
-          h += c;
-        else
-          return DEAD_END;
-      }
-    }
-  }
   return h;
 }
 
@@ -155,7 +174,7 @@ bool LandmarkSumHeuristicDal::dead_ends_are_reliable() const {
   return dead_ends_reliable;
 }
 
-//TODO: need to be adjusted correctly
+//TODO: need to be adjusted correctly for action lm layer
 class LandmarkSumHeuristicDalFeature
     : public plugins::TypedFeature<Evaluator, LandmarkSumHeuristicDal> {
 public:
