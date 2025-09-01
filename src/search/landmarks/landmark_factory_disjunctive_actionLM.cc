@@ -727,18 +727,12 @@ LandmarkNode *LandmarkFactoryDisjunctiveActionLM::ensure_action_for_factLm(
           action_nodes_by_sig.emplace(sig, action_node);
         }
       }
-      if(action_node) {
-        //wire action -> fact as a greedy-necessary/natural predecessor edge
-        if(fact_node->get_landmark().disjunctive) {
-          edge_add(*action_node, *const_cast<LandmarkNode *>(fact_node), EdgeType::GREEDY_NECESSARY);
-        } else {
-          edge_add(*action_node, *const_cast<LandmarkNode *>(fact_node), EdgeType::NATURAL);
-        }
-        
+      if (action_node) {
+        // wire action -> fact as a greedy-necessary predecessor edge
+        edge_add(*action_node, *const_cast<LandmarkNode *>(fact_node), EdgeType::GREEDY_NECESSARY);
       }
     }
   }
-
 } 
 
 //given the newly created disj fact lm node and the set of its atoms, loops over each atom in the disjunction,

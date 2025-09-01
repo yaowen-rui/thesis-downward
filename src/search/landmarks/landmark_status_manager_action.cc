@@ -1,4 +1,5 @@
 #include "landmark_status_manager_action.h"
+#include "landmark_status_manager.h"
 #include <algorithm> 
 
 namespace landmarks {
