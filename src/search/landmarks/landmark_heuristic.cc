@@ -3,9 +3,6 @@
 #include "landmark.h"
 #include "landmark_factory.h"
 #include "landmark_status_manager.h"
-#include "landmark_status_manager_action.h"
-#include "landmark_graph_action.h"
-
 #include "../plugins/plugin.h"
 #include "../task_utils/successor_generator.h"
 #include "../tasks/cost_adapted_task.h"
@@ -45,14 +42,8 @@ void LandmarkHeuristic::initialize(
 
     compute_landmark_graph(lm_factory);
     
-    //new for action layer
-    if (dynamic_cast<LandmarkGraphAction *>(lm_graph.get())) {
-        lm_status_manager = utils::make_unique_ptr<LandmarkStatusManagerAction>(
-            *lm_graph, prog_goal, prog_gn, prog_r);
-    } else {
-        lm_status_manager = utils::make_unique_ptr<LandmarkStatusManager>(
-            *lm_graph, prog_goal, prog_gn, prog_r);
-    }
+    lm_status_manager = utils::make_unique_ptr<LandmarkStatusManager>(
+        *lm_graph, prog_goal, prog_gn, prog_r);
     
     initial_landmark_graph_has_cycle_of_natural_orderings =
         landmark_graph_has_cycle_of_natural_orderings();

@@ -10,7 +10,7 @@ class LandmarkGraph;
 class LandmarkNode;
 
 class LandmarkStatusManager {
-    public: virtual ~LandmarkStatusManager() = default;//new new for landmark status_manager_action, make base polymorphic for dynamic_cast
+    public: virtual ~LandmarkStatusManager() = default;//new for action LM, make base polymorphic for dynamic_cast
     LandmarkGraph &lm_graph;
     const std::vector<LandmarkNode *> goal_landmarks;
     const std::vector<std::pair<LandmarkNode *, std::vector<LandmarkNode *>>> greedy_necessary_children;

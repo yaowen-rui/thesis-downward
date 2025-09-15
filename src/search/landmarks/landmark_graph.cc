@@ -119,8 +119,6 @@ LandmarkNode &LandmarkGraph::add_landmark(Landmark &&landmark) {
         ++num_disjunctive_landmarks;
     } else if (lm.conjunctive) { 
         ++num_conjunctive_landmarks;
-    } else if(lm.type == LandmarkType::DISJ_ACTION) {
-        //do nothing just for performing no fact-indexing for action nodes
     } else { 
         simple_landmarks_to_nodes.emplace(lm.facts.front(), new_node_p);
     } 
@@ -146,8 +144,6 @@ void LandmarkGraph::remove_node_occurrences(LandmarkNode *node) {
         }
     } else if (landmark.conjunctive) {
         --num_conjunctive_landmarks;
-    } else if(landmark.type == LandmarkType::DISJ_ACTION) {
-        //action landmark: nothing to erase from fact-index maps
     } else {
         simple_landmarks_to_nodes.erase(landmark.facts[0]);
     } 

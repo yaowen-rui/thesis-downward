@@ -67,6 +67,8 @@ public:
         bool only_causal_landmarks, utils::Verbosity verbosity);
 
     virtual bool supports_conditional_effects() const override;
+    //added for action LM
+    bool orders_enabled() const override {return use_orders;}
 };
 }
 

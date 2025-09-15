@@ -1,142 +1,150 @@
 #include "landmark_status_manager_action.h"
-#include "landmark_status_manager.h"
-#include <algorithm> 
+#include <algorithm>
+#include <cstddef>
+
+
+using namespace std;
 
 namespace landmarks {
+LandmarkStatusManagerAction::LandmarkStatusManagerAction(ActionLM &translator)
+    : lm_action_graph(translator.action_lm_graph),
+      translater(translator),
+      pastA(vector<bool>(lm_action_graph.get_num_action_lms(), false)),
+      futureA(vector<bool>(lm_action_graph.get_num_action_lms(), true)) {
+    // Number of action landmarks (ids are already assigned by ActionLM).
+    num_action_lms = lm_action_graph.get_num_action_lms();
 
-static bool lm_is_true_in_state(const LandmarkNode *n, const State &s) {
-    return n && n->get_landmark().is_true_in_state(s);
-}
+    // Build op -> action-LM incidence  (uses ActionLM graph actions).
+    const auto &ops = translater.get_task_proxy().get_operators();
+    op_to_actionLMs.assign(ops.size(), {});
+    for (const auto &up : lm_action_graph.get_nodes()) {
+        const LandmarkNodeAction *node = up.get();
+        const size_t id = static_cast<size_t>(node->get_id());
+        for (int op_id : node->get_landmarkAction().actions) {
+            if (op_id >= 0 && op_id < static_cast<int>(op_to_actionLMs.size()))
+                op_to_actionLMs[op_id].push_back(id);
+        }
+    }
 
-bool LandmarkStatusManagerAction::is_action_node(const LandmarkNode *n) {
-    if (!n) return false;
-    const Landmark &lm = n->get_landmark();
-    return lm.type == LandmarkType::DISJ_ACTION;
-}
-
-LandmarkStatusManagerAction::LandmarkStatusManagerAction(
-    LandmarkGraph &graph,
-    bool progress_goals,
-    bool progress_greedy_necessary_orderings,
-    bool progress_reasonable_orderings)
-  : LandmarkStatusManager(graph, progress_goals,
-                          progress_greedy_necessary_orderings,
-                          progress_reasonable_orderings),
-    lm_graph(graph),
-    // Initialize action bitsets: past=false, future=false by default
-    past_action_landmarks(std::vector<bool>(graph.get_num_landmarks(), false)),
-    future_action_landmarks(std::vector<bool>(graph.get_num_landmarks(), false)) {
-    // Base ctor wiring, sizes and goal/reasonable/GN caches are handled there. :contentReference[oaicite:2]{index=2}
+    // Cache predecessor sets from the ordering in the action-LM graph.
+    preds_of.assign(num_action_lms, {});
+    for (const auto &up : lm_action_graph.get_nodes()) {
+        const LandmarkNodeAction *node = up.get();
+        const size_t v = static_cast<size_t>(node->get_id());
+        for (const auto &pr : node->parents) {
+            const LandmarkNodeAction *pnode = pr.first;
+            preds_of[v].push_back(static_cast<size_t>(pnode->get_id()));
+        }
+    }
 }
 
 BitsetView LandmarkStatusManagerAction::get_past_action_landmarks(const State &state) {
-    return past_action_landmarks[state];
-}
-BitsetView LandmarkStatusManagerAction::get_future_action_landmarks(const State &state) {
-    return future_action_landmarks[state];
+    return pastA[state];
 }
 ConstBitsetView LandmarkStatusManagerAction::get_past_action_landmarks(const State &state) const {
-    return past_action_landmarks[state];
+    return pastA[state];
+}
+
+BitsetView LandmarkStatusManagerAction::get_future_action_landmarks(const State &state) {
+    return futureA[state];
 }
 ConstBitsetView LandmarkStatusManagerAction::get_future_action_landmarks(const State &state) const {
-    return future_action_landmarks[state];
+    return futureA[state];
 }
 
 void LandmarkStatusManagerAction::progress_initial_state(const State &initial_state) {
-    // 1) run base initialization for FACT landmarks (fills past/future) :contentReference[oaicite:3]{index=3}
-    LandmarkStatusManager::progress_initial_state(initial_state);
+    // past = 0, future = 1  
+    BitsetView past   = get_past_action_landmarks(initial_state);
+    BitsetView future = get_future_action_landmarks(initial_state);
+    past.reset();
+    future.reset();
+    for (size_t i = 0; i < num_action_lms; ++i)
+        future.set(i);
+}
 
-    // 2) initialize ACTION landmark bitsets
-    BitsetView pastA   = get_past_action_landmarks(initial_state);
-    BitsetView futureA = get_future_action_landmarks(initial_state);
-
-    pastA.reset();   // initially, no action was applied
-    futureA.reset(); // set selectively below
-
-    for (auto &node_up : lm_graph.get_nodes()) { // lm_graph comes from base class
-        LandmarkNode *n = node_up.get();
-        if (!is_action_node(n))
-            continue;
-
-        const int id = n->get_id();
-
-        // "Needed initially" iff any GREEDY_NECESSARY child is not true initially
-        bool needed = false;
-        for (auto &ch : n->children) {
-            if (ch.second == EdgeType::GREEDY_NECESSARY) {
-                if (!lm_is_true_in_state(ch.first, initial_state)) {
-                    needed = true;
-                    break;
-                }
-            }
+void LandmarkStatusManagerAction::progress_goals(const State &ancestor_state, BitsetView &future_out) {
+    // Make 'future' consistent with current 'past' and ordering.
+    ConstBitsetView past = get_past_action_landmarks(ancestor_state);
+    // If caller passes 'future_out' as our internal future bitset view for this state,
+    // this will directly update it. Otherwise it just writes into the provided view.
+    for (size_t a = 0; a < num_action_lms; ++a) {
+        bool some_pred_not_past = false;
+        for (size_t p : preds_of[a]) {
+            if (!past.test(p)) { some_pred_not_past = true; break; }
         }
-        if (needed)
-            futureA.set(id);
+        if (!past.test(a) || some_pred_not_past)
+            future_out.set(a);
         else
-            futureA.reset(id);
-        // pastA stays reset(id)
+            future_out.reset(a);
     }
 }
 
 void LandmarkStatusManagerAction::progress(
-    const State &parent_ancestor_state, OperatorID applied_op_id,
-    const State &ancestor_state) {
-
-    if (ancestor_state == parent_ancestor_state) {
-        // Mirror base early-out for degenerate transitions. :contentReference[oaicite:4]{index=4}
+    const State &parent_state, OperatorID applied_op_id, const State &state) {
+    if (state == parent_state)
         return;
+
+    // Views of parent and current.
+    ConstBitsetView past0   = get_past_action_landmarks(parent_state);
+    ConstBitsetView future0 = get_future_action_landmarks(parent_state);
+    BitsetView      past1   = get_past_action_landmarks(state);
+    BitsetView      future1 = get_future_action_landmarks(state);
+
+    // Copy parent flags to child, we'll update delta below.
+    past1.reset();
+    future1.reset();
+    for (size_t i = 0; i < num_action_lms; ++i) {
+        if (past0.test(i))   past1.set(i);
+        if (future0.test(i)) future1.set(i);
     }
 
-    // 1) progress FACT landmarks in base manager (updates past/future) :contentReference[oaicite:5]{index=5}
-    LandmarkStatusManager::progress(parent_ancestor_state, applied_op_id, ancestor_state);
+    // Which A contain the applied operator 'a'?
+    const int a = applied_op_id.get_index();
+    std::vector<char> affected(num_action_lms, 0);
+    if (a >= 0 && a < static_cast<int>(op_to_actionLMs.size())) {
+        for (size_t A : op_to_actionLMs[a]) {
+            affected[A] = 1;
 
-    // 2) progress ACTION landmark bitsets
-    ConstBitsetView parent_pastA   = get_past_action_landmarks(parent_ancestor_state);
-    BitsetView pastA               = get_past_action_landmarks(ancestor_state);
-    BitsetView futureA             = get_future_action_landmarks(ancestor_state);
+            // Rule: if a ∈ A then past(A) := true
+            past1.set(A);
 
-    // We also need current FACT 'future' to decide if an action is still needed
-    ConstBitsetView futureFacts    = get_future_landmarks(ancestor_state);
+            // Rule: future(A) := false iff all predecessors of A were past in s0, else true
+            bool all_pred_past_in_s0 = true;
+            for (size_t P : preds_of[A]) {
+                if (!past0.test(P)) { all_pred_past_in_s0 = false; break; }
+            }
+            if (all_pred_past_in_s0)
+                future1.reset(A);
+            else
+                future1.set(A);
+        }
+    }
 
-    const int op_id = applied_op_id.get_index();
-
-    // Inherit & update
-    for (auto &node_up : lm_graph.get_nodes()) {
-        LandmarkNode *n = node_up.get();
-        if (!is_action_node(n))
+    // Handle all A with a ∉ A (your “else” branch).
+    for (size_t A = 0; A < num_action_lms; ++A) {
+        if (affected[A])
             continue;
 
-        const int id = n->get_id();
-        const Landmark &alm = n->get_landmark();
-
-        // ---- PAST(action): monotone + "consume if just applied"
-        if (parent_pastA.test(id)) {
-            pastA.set(id);
+        if (future0.test(A)) {
+            // If future(A) was already true in s0, keep it true in s1.
+            // (We already copied it; nothing to do.)
+            continue;
         } else {
-            // Not past previously: check if the applied operator is one of the action IDs
-            // (action_ids were canonicalized when node was created)
-            if (std::binary_search(alm.action_ids.begin(), alm.action_ids.end(), op_id)) {
-                pastA.set(id);
-            } else {
-                pastA.reset(id);
+            // If future(A) was false in s0 but some predecessor of A is not past in s1, set future(A) true.
+            bool some_pred_not_past_in_s1 = false;
+            for (size_t P : preds_of[A]) {
+                if (!past1.test(P)) { some_pred_not_past_in_s1 = true; break; }
             }
+            if (some_pred_not_past_in_s1)
+                future1.set(A);
+            // Otherwise leave future(A) false and past(A) unchanged (already copied).
         }
-
-        // ---- FUTURE(action): needed iff any GN child is FUTURE (fact) now
-        bool needed = false;
-        for (auto &ch : n->children) {
-            if (ch.second == EdgeType::GREEDY_NECESSARY) {
-                if (futureFacts.test(ch.first->get_id())) {
-                    needed = true;
-                    break;
-                }
-            }
-        }
-        if (needed)
-            futureA.set(id);
-        else
-            futureA.reset(id);
     }
 }
 
+void LandmarkStatusManagerAction::progress(
+    const State &parent_state, int applied_op_index, const State &state) {
+    progress(parent_state, OperatorID(applied_op_index), state);
 }
+
+} 

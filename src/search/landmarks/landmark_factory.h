@@ -37,7 +37,13 @@ public:
     bool achievers_are_calculated() const {
         return achievers_calculated;
     }
-
+    //before was in protected, changed to public for action LM
+    const std::vector<int> &get_operators_including_eff(const FactPair &eff) const {
+            return operators_eff_lookup[eff.var][eff.value];//operators_eff_lookup is a 3D vector indexed as [var][val]-> list of operator IDs that achieve that fact
+        }
+    //added for action LM
+    virtual bool orders_enabled() const {return false;}
+    
 protected:
     explicit LandmarkFactory(utils::Verbosity verbosity);
     mutable utils::LogProxy log;
@@ -51,9 +57,7 @@ protected:
     bool is_landmark_precondition(const OperatorProxy &op,
                                   const Landmark &landmark) const;
 
-    const std::vector<int> &get_operators_including_eff(const FactPair &eff) const {
-        return operators_eff_lookup[eff.var][eff.value];//operators_eff_lookup is a 3D vector indexed as [var][val]-> list of operator IDs that achieve that fact
-    }
+    
 
 private:
     AbstractTask *lm_graph_task;
