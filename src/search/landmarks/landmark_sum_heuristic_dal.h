@@ -1,44 +1,43 @@
-//
-// Created by rui on 15.08.2025.
-//
-
-#ifndef FAST_DOWNWARD_LANDMARK_SUM_HEURISTIC_DAL_H
-#define FAST_DOWNWARD_LANDMARK_SUM_HEURISTIC_DAL_H
+#ifndef LANDMARK_SUM_HEURISTIC_DAL_H
+#define LANDMARK_SUM_HEURISTIC_DAL_H
 
 #include "landmark_heuristic.h"
-
-namespace landmarks {
-class LandmarkFactoryDisjunctiveActionLM; //forward declaration
-}
+#include "landmark_status_manager_action.h"
+#include "transformer.h"
 
 namespace landmarks {
 class LandmarkSumHeuristicDal : public LandmarkHeuristic {
-  const bool dead_ends_reliable;
+private:
+  Transformer transformer;
 
-  std::vector<int> min_first_achiever_costs;
-  std::vector<int> min_possible_achiever_costs;
+  LandmarkStatusManagerAction lm_status_manager_action;
 
-  //for action layer
-  std::vector<int> min_action_costs;// precompute min operator cost for each ACTION node id
-  std::vector<unsigned char> is_action_node;//for each node id: 1 if it's an action lm, else 0
-  bool use_action_layer = false;//true iff graph contains any action lm nodes
-  int get_min_cost_of_achievers(const std::vector<int> &op_ids);
+  const bool dead_ends_reliable=true;
 
-  int get_min_cost_of_achievers(
-      const std::unordered_set<int> &achievers) const;
+  // Cached per-action-landmark minimal operator cost.
+  // Indexed by action-LM node id.
+  std::vector<int> min_costs_per_action_lm;
 
-  void compute_landmark_costs();
+  void initialize_costs();
+  void setup_transformer(const std::shared_ptr<LandmarkFactory> &lm_factory);
 
+protected:
   int get_heuristic_value(const State &ancestor_state) override;
+  
 public:
   LandmarkSumHeuristicDal(
-      const std::shared_ptr<LandmarkFactory> &lm_factory, bool pref,
-      bool prog_goal, bool prog_gn, bool prog_r,
-      const std::shared_ptr<AbstractTask> &transform,
+      const std::shared_ptr<LandmarkFactory> &lm_factory,//use lm_factory to build transformer, them create action lm graph
+      const std::shared_ptr<AbstractTask> &task_transform,
       bool cache_estimates, const std::string &description,
       utils::Verbosity verbosity, tasks::AxiomHandlingType axioms);
 
-  virtual bool dead_ends_are_reliable() const override;
+  bool dead_ends_are_reliable() const override {return dead_ends_reliable;};
+
+  int compute_heuristic(const State &ancestor_state) override;
+  void notify_initial_state(const State &initial_state) override;
+  void notify_state_transition(const State &parent_state,
+                             OperatorID op_id,
+                             const State &state) override;
 };
 }
 

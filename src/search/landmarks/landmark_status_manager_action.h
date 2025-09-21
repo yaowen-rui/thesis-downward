@@ -1,7 +1,7 @@
 #ifndef LANDMARKS_LANDMARK_STATUS_MANAGER_ACTION_H
 #define LANDMARKS_LANDMARK_STATUS_MANAGER_ACTION_H
 
-#include "action_LM.h"                 
+#include "transformer.h"                 
 #include "../per_state_bitset.h"
 
 namespace landmarks {
@@ -10,8 +10,8 @@ class LandmarkStatusManagerAction {
     LandmarkGraphAction &lm_action_graph;
 
 public:
-    // Construct from ActionLM so we can (1) access the action-LM graph and (2) the task's operator count.
-    explicit LandmarkStatusManagerAction(ActionLM &translator);
+    // Construct from ActionLM so we can (1) access the action landmark graph and (2) the task's operator count.
+    explicit LandmarkStatusManagerAction(Transformer &translator);
 
     // Bitset accessors for the current state.
     BitsetView get_past_action_landmarks(const State &state);
@@ -24,30 +24,21 @@ public:
     // - future(A) = true for all A (every action-LM still has to occur)
     void progress_initial_state(const State &initial_state);
 
-    // (Optional) make 'future' consistent w.r.t. current 'past' in ancestor_state.
-    // If some predecessor of A is not past, future(A) := true; else if past(A) then future(A) := false.
+    //i am not sure if we need progress goals
     void progress_goals(const State &ancestor_state, BitsetView &future);
 
-    // rules:
-    // If s0 --a--> s1 and a ∈ A:
-    //   past(A) := true;
-    //   future(A) := false iff all predecessors of A were past in s0; else true.
-    // If a ∉ A:
-    //   if future(A) was true in s0, keep it true;
-    //   else if some predecessor of A is not past in s1, set future(A) := true;
-    //   else leave future(A) false and past(A) unchanged.
     void progress(const State &parent_state, OperatorID applied_op_id, const State &state);
 
     // overload with raw operator index.
     void progress(const State &parent_state, int applied_op_index, const State &state);
 
 private:
-    ActionLM &translater;
+    Transformer &translater;
 
     PerStateBitset pastA;   // past(A) — achieved at least once on path so far
     PerStateBitset futureA; // future(A) — must still occur after current state
 
-    // - predecessors of each action-LM node (by node id)
+    // - natural ordering: predecessors of each action-LM node (by node id)
     std::vector<std::vector<size_t>> preds_of;
     // - operators -> action-LM ids containing that operator
     std::vector<std::vector<size_t>> op_to_actionLMs;
