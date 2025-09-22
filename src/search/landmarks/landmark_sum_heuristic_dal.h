@@ -27,6 +27,7 @@ protected:
 public:
   LandmarkSumHeuristicDal(
       const std::shared_ptr<LandmarkFactory> &lm_factory,//use lm_factory to build transformer, them create action lm graph
+      bool /*pref*/, bool /*prog_goal*/, bool /*prog_gn*/, bool /*prog_r*/,
       const std::shared_ptr<AbstractTask> &task_transform,
       bool cache_estimates, const std::string &description,
       utils::Verbosity verbosity, tasks::AxiomHandlingType axioms);
