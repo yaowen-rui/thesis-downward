@@ -6,12 +6,16 @@
 #include <unordered_set>
 #include <set>
 #include <memory>
+#include <cassert>
+#include <utility>
+
 
 #include "../task_proxy.h"
 #include "../abstract_task.h"
 #include "../utils/hash.h"
 #include "landmark_graph.h"
 #include "landmark_factory.h"
+#include "../utils/logging.h"
 
 namespace landmarks {
 
@@ -22,7 +26,7 @@ class LandmarkFactory;
 class ActionLandmark {
 public:
     std::vector<int> actions; //operator IDs
-    ActionLandmark(std::vector<int> op_IDs): actions(move(op_IDs)) {}
+    ActionLandmark(std::vector<int> op_IDs): actions(std::move(op_IDs)) {}
 
 };
 
@@ -84,7 +88,8 @@ public:
     LandmarkGraphAction action_lm_graph;
 
     std::shared_ptr<LandmarkFactory> lm_factory;//initialize in constructor, lm_factory should be passed in as a parameter
-    utils::LogProxy log = utils::LogProxy(std::make_shared<utils::Log>("action_LM"));
+    utils::LogProxy log = lm_factory->log;
+
     
     //build action lm graph (nodes+edges) from fact lm graph
     void build_action_lm_graph(LandmarkGraph *lm_graph);

@@ -860,6 +860,7 @@ create_fast_downward_library(
         landmarks/landmark_status_manager
         landmarks/landmark_sum_heuristic
         landmarks/util
+        landmarks/transformer
     DEPENDS
         default_value_axioms_task
         lp_solver

@@ -43,10 +43,10 @@ public:
         }
     //added for action LM
     virtual bool orders_enabled() const {return false;}
-    
+    mutable utils::LogProxy log;
 protected:
     explicit LandmarkFactory(utils::Verbosity verbosity);
-    mutable utils::LogProxy log;
+    
     std::shared_ptr<LandmarkGraph> lm_graph;
     bool achievers_calculated = false;
 
