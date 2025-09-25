@@ -60,6 +60,7 @@ public:
     virtual void notify_state_transition(const State &parent_state,
                                          OperatorID op_id,
                                          const State &state) override;
+    ~LandmarkHeuristic();//added for landmark_sum_heuristic_dal
 };
 
 extern void add_landmark_heuristic_options_to_feature(

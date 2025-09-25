@@ -4,8 +4,12 @@
 #include "landmark_heuristic.h"
 #include "landmark_status_manager_action.h"
 #include "transformer.h"
+#include "../task_utils/successor_generator.h"
+#include "../task_utils/task_properties.h"
+
 
 namespace landmarks {
+
 class LandmarkSumHeuristicDal : public LandmarkHeuristic {
 private:
   Transformer transformer;

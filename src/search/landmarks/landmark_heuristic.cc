@@ -12,6 +12,8 @@
 using namespace std;
 
 namespace landmarks {
+LandmarkHeuristic::~LandmarkHeuristic() = default;//added for landmark_sum_heuristic_dal
+
 LandmarkHeuristic::LandmarkHeuristic(
     bool use_preferred_operators,
     const shared_ptr<AbstractTask> &transform, bool cache_estimates,

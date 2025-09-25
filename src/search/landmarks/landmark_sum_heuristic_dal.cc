@@ -15,6 +15,7 @@
 using namespace std;
 
 namespace landmarks {
+
 LandmarkSumHeuristicDal::LandmarkSumHeuristicDal(
   const shared_ptr<LandmarkFactory> &lm_factory,
   bool /*pref*/, bool /*prog_goal*/, bool /*prog_gn*/, bool /*prog_r*/,
