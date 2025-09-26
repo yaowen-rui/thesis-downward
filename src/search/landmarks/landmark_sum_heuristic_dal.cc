@@ -30,20 +30,15 @@ LandmarkSumHeuristicDal::LandmarkSumHeuristicDal(
     transformer(task_proxy, lm_factory, task_transform),
     lm_status_manager_action(transformer) {
       if (log.is_at_least_normal()) {
-          log << "Initializing LandmarkSumHeuristicDal (action landmarks)..." << endl;
+          log << "Initializing Action Landmark Sum Heuristic..." << endl;
       }
 
       initialize_costs();
       
       // Initialize action-landmark past/future for the initial state:
       // past = ∅, future = All.
-      State init = task_proxy.get_initial_state();
-      lm_status_manager_action.progress_initial_state(init);
-
-      if (log.is_at_least_normal()) {
-          log << "Action-LM nodes: "
-              << transformer.action_lm_graph.get_num_action_lms() << endl;
-      }
+      //State init = task_proxy.get_initial_state();
+      //lm_status_manager_action.progress_initial_state(init);
   }
 
 void LandmarkSumHeuristicDal::initialize_costs() {
@@ -68,7 +63,11 @@ int LandmarkSumHeuristicDal::get_heuristic_value(const State &ancestor_state) {
 }
 
 int LandmarkSumHeuristicDal::compute_heuristic(const State &ancestor_state) {
-  return get_heuristic_value(ancestor_state);
+  const int h = get_heuristic_value(ancestor_state);
+  // if(log.is_at_least_normal() && h < local_best_h) {
+  //   log << "New best heuristic value for " << get_description()<< ": "<< h << endl;
+  // }
+  return h;
 }
 
 void LandmarkSumHeuristicDal::notify_initial_state(const State &initial_state) {
@@ -83,14 +82,14 @@ void LandmarkSumHeuristicDal::notify_state_transition(
 
 class LandmarkSumHeuristicDalFeature : public plugins::TypedFeature<Evaluator, LandmarkSumHeuristicDal> {
 public:
-  LandmarkSumHeuristicDalFeature() : TypedFeature("landmark_sum_action_heuristic") {
-    // Docs (keep concise; mirror classic file’s style)
+  LandmarkSumHeuristicDalFeature() : TypedFeature("lm_sum_action") {
+    
     document_title("Landmark sum heuristic (Action-Landmark variant)");
     document_synopsis(
       "h^sum over action landmarks. Builds an Action-LM graph via a transformer "
       "and maintains past/future only for action landmarks during search.");
 
-    // Reuse the standard landmark-heuristic options block so users get the same flags
+    // Reuse the standard landmark-heuristic options block 
     add_landmark_heuristic_options_to_feature(*this, "landmark_sum_action_heuristic");
     // Axioms handling option (same as classic)
     tasks::add_axioms_option_to_feature(*this);
@@ -118,3 +117,4 @@ static plugins::FeaturePlugin<LandmarkSumHeuristicDalFeature> _plugin;
 
 }
 
+//use the command to test: ./fast-downward.py misc/tests/benchmarks/miconic/s1-0.pddl --search "astar(landmark_sum_action_heuristic(lm_rhw()))"

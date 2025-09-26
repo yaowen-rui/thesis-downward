@@ -9,8 +9,8 @@ namespace landmarks {
 LandmarkStatusManagerAction::LandmarkStatusManagerAction(Transformer &translator)
     : lm_action_graph(translator.action_lm_graph),
       translater(translator),
-      pastA(vector<bool>(lm_action_graph.get_num_action_lms(), true)),
-      futureA(vector<bool>(lm_action_graph.get_num_action_lms(), false)) {
+      pastA(vector<bool>(lm_action_graph.get_num_action_lms(), false)),
+      futureA(vector<bool>(lm_action_graph.get_num_action_lms(), true)) {
     
         // Number of action landmarks (ids are already assigned by ActionLM).
     num_action_lms = lm_action_graph.get_num_action_lms();
@@ -43,6 +43,7 @@ BitsetView LandmarkStatusManagerAction::get_past_action_landmarks(const State &s
     return pastA[state];
 }
 ConstBitsetView LandmarkStatusManagerAction::get_past_action_landmarks(const State &state) const {
+    (void) const_cast<LandmarkStatusManagerAction*>(this)->pastA[state];
     return pastA[state];
 }
 
@@ -50,6 +51,7 @@ BitsetView LandmarkStatusManagerAction::get_future_action_landmarks(const State 
     return futureA[state];
 }
 ConstBitsetView LandmarkStatusManagerAction::get_future_action_landmarks(const State &state) const {
+    (void) const_cast<LandmarkStatusManagerAction*>(this)->futureA[state];
     return futureA[state];
 }
 
@@ -117,7 +119,7 @@ void LandmarkStatusManagerAction::progress(
             if (violates) break;
         }
     }
-
+    
     // Apply Hit(op) if no violation: all action-LMs containing 'op' are achieved on this transition.
     if (!violates && op >= 0 && op < static_cast<int>(op_to_actionLMs.size())) {
         for (size_t A : op_to_actionLMs[op]) {
@@ -127,22 +129,30 @@ void LandmarkStatusManagerAction::progress(
     }
 
     // ---- Merge this edge-result into the target state's stored bitsets ----
-    //   past(s)   := past(s)   ∧ past_edge
-    //   future(s) := future(s) ∨ future_edge
+    //   Merge across multiple incoming paths to the same StateID:
+    //   past(s)   := past(s)   ∨ past_edge
+    //   future(s) := future(s) ∧ future_edge
     BitsetView past1   = get_past_action_landmarks(state);
     BitsetView future1 = get_future_action_landmarks(state);
 
     for (size_t i = 0; i < num_action_lms; ++i) {
-        // Intersection for past
-        if (!past_edge[i] && past1.test(i)) {
-            past1.reset(i);
+        // // Intersection for past
+        // if (!past_edge[i] && past1.test(i)) {
+        //     past1.reset(i);
+        // }
+        // // Union for future
+        // if (future_edge[i] && !future1.test(i)) {
+        //     future1.set(i);
+        // }
+        // OR for past
+       if (past_edge[i]) {
+            past1.set(i);
         }
-        // Union for future
-        if (future_edge[i] && !future1.test(i)) {
-            future1.set(i);
+        // AND for future
+        if (!future_edge[i] && future1.test(i)) {
+            future1.reset(i);
         }
     }
-    
 }
 
 void LandmarkStatusManagerAction::progress(

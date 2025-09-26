@@ -23,7 +23,9 @@ private:
   std::vector<int> min_costs_per_action_lm;
 
   void initialize_costs();
-  void setup_transformer(const std::shared_ptr<LandmarkFactory> &lm_factory);
+  
+  // Track the best (smallest) h-value we've seen so far to report improvements.
+  int local_best_h = std::numeric_limits<int>::max();
 
 protected:
   int get_heuristic_value(const State &ancestor_state) override;

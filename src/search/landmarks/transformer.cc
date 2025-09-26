@@ -99,6 +99,7 @@ vector<int> Transformer::to_sorted_vector(std::unordered_set<int> &&s) {
 }
 
 void Transformer::build_action_lm_graph(LandmarkGraph *lm_graph) {
+    utils::Timer timer;
     auto &nodes = lm_graph->get_nodes();//vector<unique_ptr<LandmarkNode>>&
     factNode_to_actionNode.clear();
 
@@ -125,6 +126,10 @@ void Transformer::build_action_lm_graph(LandmarkGraph *lm_graph) {
     //set up edges(natural ordering) between action lm nodes
     setUp_edge(); 
     action_lm_graph.set_action_lm_ids(); 
+    if(log.is_at_least_normal()) {
+        log << "Action landmark graph generation time: " << timer << endl;
+        log << "Number of action landmarks: " << action_lm_graph.get_num_action_lms() << endl;
+    }
     
 }
 
