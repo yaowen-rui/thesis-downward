@@ -24,8 +24,13 @@ private:
 
   void initialize_costs();
   
-  // Track the best (smallest) h-value we've seen so far to report improvements.
+  // Track the best (smallest) h-value we've seen so far
   int local_best_h = std::numeric_limits<int>::max();
+  // best known h per state (min over parents)
+  std::unordered_map<int, int> best_h_by_state;
+
+  //compute edge-local h from parent future minus Hit(op)
+  int compute_edge_local_h(const State &parent_state, OperatorID op_id) const;
 
 protected:
   int get_heuristic_value(const State &ancestor_state) override;

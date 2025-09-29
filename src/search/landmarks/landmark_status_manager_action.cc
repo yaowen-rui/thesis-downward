@@ -130,28 +130,26 @@ void LandmarkStatusManagerAction::progress(
 
     // ---- Merge this edge-result into the target state's stored bitsets ----
     //   Merge across multiple incoming paths to the same StateID:
-    //   past(s)   := past(s)   ∨ past_edge
-    //   future(s) := future(s) ∧ future_edge
     BitsetView past1   = get_past_action_landmarks(state);
     BitsetView future1 = get_future_action_landmarks(state);
 
     for (size_t i = 0; i < num_action_lms; ++i) {
-        // // Intersection for past
-        // if (!past_edge[i] && past1.test(i)) {
-        //     past1.reset(i);
-        // }
-        // // Union for future
-        // if (future_edge[i] && !future1.test(i)) {
-        //     future1.set(i);
-        // }
+        // Intersection for past
+        if (!past_edge[i] && past1.test(i)) {
+            past1.reset(i);
+        }
+        // Union for future
+        if (future_edge[i] && !future1.test(i)) {
+            future1.set(i);
+        }
         // OR for past
-       if (past_edge[i]) {
-            past1.set(i);
-        }
-        // AND for future
-        if (!future_edge[i] && future1.test(i)) {
-            future1.reset(i);
-        }
+    //    if (past_edge[i]) {
+    //         past1.set(i);
+    //     }
+    //     // AND for future
+    //     if (!future_edge[i] && future1.test(i)) {
+    //         future1.reset(i);
+    //     }
     }
 }
 

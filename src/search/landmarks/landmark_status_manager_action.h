@@ -32,6 +32,9 @@ public:
     // overload with raw operator index.
     void progress(const State &parent_state, int applied_op_index, const State &state);
 
+    const std::vector<std::vector<size_t>> &get_preds_of() const { return preds_of; }
+    const std::vector<std::vector<size_t>> &get_op_to_actionLMs() const { return op_to_actionLMs; }
+
 private:
     Transformer &translater;
 
