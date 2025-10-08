@@ -110,6 +110,9 @@ void Transformer::build_action_lm_graph(LandmarkGraph *lm_graph) {
         op_union.reserve(16);
 
         const Landmark &lm = node->get_landmark();//fact lm node
+        State initial_state = task_proxy.get_initial_state();
+        if(!lm.is_true_in_state(initial_state)) //skip those fact lm nodes that are true in initial state
+            continue;
         //derive actions (achievers) from fact lm node
         for(const FactPair &atom: lm.facts) {
             const vector<int> &ops = lm_factory->get_operators_including_eff(atom);

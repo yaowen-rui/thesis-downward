@@ -119,6 +119,11 @@ void LandmarkSumHeuristicDal::notify_state_transition(
     } else {
         it->second = std::min(it->second, h_edge);// better parent
     }
+
+    // force h(goal) = 0 when the child is already a goal.
+    if (task_properties::is_goal_state(task_proxy, state)) {
+        best_h_by_state[sid] = 0;
+    }
 }
 
 class LandmarkSumHeuristicDalFeature : public plugins::TypedFeature<Evaluator, LandmarkSumHeuristicDal> {
@@ -161,3 +166,4 @@ static plugins::FeaturePlugin<LandmarkSumHeuristicDalFeature> _plugin;
 //use the command to test: 
 //./fast-downward.py misc/tests/benchmarks/miconic/s1-0.pddl --search "astar(lm_sum_action(lm_rhw(use_orders=true)))"
 //./fast-downward.py misc/tests/benchmarks/miconic/s1-0.pddl --search "astar(lm_sum_action(lm_reasonable_orders_hps(lm_rhw())))"
+//./fast-downward.py misc/tests/benchmarks/miconic/s1-0.pddl --search "lazy_greedy([lm_sum_action(lm_rhw(use_orders=true))])"
