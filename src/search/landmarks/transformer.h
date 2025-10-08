@@ -55,7 +55,7 @@ public:
 class LandmarkGraphAction {
 
 public:
-    LandmarkGraphAction() = default;;
+    LandmarkGraphAction() = default;
     using Nodes = std::vector<std::unique_ptr<ActionLandmarkNode>>;
 
     ActionLandmarkNode &add_action_lm(ActionLandmark &&action_lm);
