@@ -102,6 +102,7 @@ void Transformer::build_action_lm_graph(LandmarkGraph *lm_graph) {
     utils::Timer timer;
     auto &nodes = lm_graph->get_nodes();//vector<unique_ptr<LandmarkNode>>&
     factNode_to_actionNode.clear();
+    const State initial_state = task_proxy.get_initial_state();
 
     for (const auto &nptr: nodes) {
         LandmarkNode *node = nptr.get();
@@ -110,9 +111,20 @@ void Transformer::build_action_lm_graph(LandmarkGraph *lm_graph) {
         op_union.reserve(16);
 
         const Landmark &lm = node->get_landmark();//fact lm node
-        State initial_state = task_proxy.get_initial_state();
-        if(!lm.is_true_in_state(initial_state)) //skip those fact lm nodes that are true in initial state
+        const bool holds_initially = lm.is_true_in_state(initial_state);
+        // A parent that doesn't hold in s0 implies this landmark must be re-added later.
+        const bool has_parent_not_holding_initially = std::any_of(
+            node->parents.begin(), node->parents.end(),
+            [&](const std::pair<LandmarkNode *, EdgeType> &par) {
+                return !par.first->get_landmark().is_true_in_state(initial_state);
+            });
+
+        const bool should_transform =
+            !holds_initially || (holds_initially && has_parent_not_holding_initially);
+
+        if (!should_transform)
             continue;
+        
         //derive actions (achievers) from fact lm node
         for(const FactPair &atom: lm.facts) {
             const vector<int> &ops = lm_factory->get_operators_including_eff(atom);

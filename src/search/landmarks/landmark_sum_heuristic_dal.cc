@@ -166,4 +166,4 @@ static plugins::FeaturePlugin<LandmarkSumHeuristicDalFeature> _plugin;
 //use the command to test: 
 //./fast-downward.py misc/tests/benchmarks/miconic/s1-0.pddl --search "astar(lm_sum_action(lm_rhw(use_orders=true)))"
 //./fast-downward.py misc/tests/benchmarks/miconic/s1-0.pddl --search "astar(lm_sum_action(lm_reasonable_orders_hps(lm_rhw())))"
-//./fast-downward.py misc/tests/benchmarks/miconic/s1-0.pddl --search "lazy_greedy([lm_sum_action(lm_rhw(use_orders=true))])"
+//./fast-downward.py misc/tests/benchmarks/miconic/s1-0.pddl --search "lazy_greedy([lm_sum_action(lm_zg(use_orders=true))])"
