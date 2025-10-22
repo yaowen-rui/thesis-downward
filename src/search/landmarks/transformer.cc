@@ -125,11 +125,12 @@ void Transformer::build_action_lm_graph(LandmarkGraph *lm_graph) {
         if (!should_transform)
             continue;
         
-        //derive actions (achievers) from fact lm node
-        for(const FactPair &atom: lm.facts) {
-            const vector<int> &ops = lm_factory->get_operators_including_eff(atom);
-            op_union.insert(ops.begin(), ops.end());
-        }
+        //derive first achievers from fact lm node
+        // for(const FactPair &atom: lm.facts) {
+        //     const vector<int> &ops = lm_factory->get_operators_including_eff(atom);
+        //     op_union.insert(ops.begin(), ops.end());
+        // }
+        op_union.insert(lm.first_achievers.begin(), lm.first_achievers.end());
         vector<int> opIDs = to_sorted_vector(std::move(op_union));
 
         //create action lm, action lm node, add node to action lm graph
@@ -161,6 +162,8 @@ void Transformer::compute_min_costs() {
     const int N = action_lm_graph.get_num_action_lms();
     min_cost.assign(N, 0);
 
+    const int min_operator_cost = task_properties::get_min_operator_cost(task_proxy);
+
     for (const auto &up : action_lm_graph.get_nodes()) {
         const auto &acts = up->get_Actionlandmark().actions;
         int best = std::numeric_limits<int>::max();
@@ -171,8 +174,9 @@ void Transformer::compute_min_costs() {
                 best = std::min(best, it->second);
             }
         }
-        if (best == std::numeric_limits<int>::max())
-            best = 0; // empty A contributes 0
+        if (acts.empty() || best == std::numeric_limits<int>::max())
+            //best = 0; // empty A contributes 0
+            best = min_operator_cost;
 
         min_cost[up->get_id()] = best;
     }

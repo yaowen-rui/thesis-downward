@@ -56,7 +56,7 @@ ConstBitsetView LandmarkStatusManagerAction::get_future_action_landmarks(const S
 }
 
 void LandmarkStatusManagerAction::progress_initial_state(const State &initial_state) {
-    // For the initial state we explicitly set: past=false, future=true (your spec).
+    // For the initial state we explicitly set: past=false, future=true
     BitsetView past   = get_past_action_landmarks(initial_state);
     BitsetView future = get_future_action_landmarks(initial_state);
     for (size_t i = 0; i < num_action_lms; ++i) {
