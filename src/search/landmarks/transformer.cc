@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <unordered_set>
 #include <limits>
+#include "util.h"
 
 #include "../task_utils/task_properties.h"
 #include "../utils/logging.h"
@@ -125,16 +126,12 @@ void Transformer::build_action_lm_graph(LandmarkGraph *lm_graph) {
         if (!should_transform)
             continue;
         
-        //derive first achievers from fact lm node
-        // for(const FactPair &atom: lm.facts) {
-        //     const vector<int> &ops = lm_factory->get_operators_including_eff(atom);
-        //     op_union.insert(ops.begin(), ops.end());
-        // }
         op_union.insert(lm.first_achievers.begin(), lm.first_achievers.end());
         vector<int> opIDs = to_sorted_vector(std::move(op_union));
 
         //create action lm, action lm node, add node to action lm graph
         ActionLandmark action_lm(vector<int>(opIDs.begin(), opIDs.end()));
+        action_lm.possible_achievers = lm.possible_achievers;
         ActionLandmarkNode *new_action_lm_node = &action_lm_graph.add_action_lm(move(action_lm));
         // map fact lm node to action lm node
         factNode_to_actionNode[node] = new_action_lm_node; 
@@ -179,6 +176,26 @@ void Transformer::compute_min_costs() {
             best = min_operator_cost;
 
         min_cost[up->get_id()] = best;
+    }
+}
+
+int Transformer::get_min_cost_of_achievers(
+    const std::unordered_set<int> &achievers) const {
+    int min_cost = numeric_limits<int>::max();
+    for (int id : achievers) {
+        OperatorProxy op = get_operator_or_axiom(task_proxy, id);
+        min_cost = min(min_cost, op.get_cost());
+    }
+    return min_cost;
+}
+
+void Transformer::compute_min_possible_costs() {
+    const int N = action_lm_graph.get_num_action_lms();
+    possible_min_cost.assign(N, 0);
+
+    for (const auto &up : action_lm_graph.get_nodes()) {
+        const auto &possible_achievers = up->get_Actionlandmark().possible_achievers;
+        possible_min_cost[up->get_id()] = get_min_cost_of_achievers(possible_achievers);
     }
 }
 

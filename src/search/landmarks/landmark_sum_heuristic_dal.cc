@@ -43,6 +43,7 @@ LandmarkSumHeuristicDal::LandmarkSumHeuristicDal(
 
 void LandmarkSumHeuristicDal::initialize_costs() {
   min_costs_per_action_lm = transformer.get_min_cost();
+  min_possible_costs_per_action_lm = transformer.get_min_possible_cost();
 
 }
 
@@ -55,7 +56,7 @@ int LandmarkSumHeuristicDal::compute_edge_local_h(const State &parent_state, Ope
     // Build edge-local future := future(parent) \ Hit(op)
     const int n = static_cast<int>(transformer.action_lm_graph.get_num_action_lms());
     std::vector<char> future_edge(n, 0);
-    for (int i = 0; i < n; ++i)
+    for (int i = 0; i < n; ++i) 
         future_edge[i] = future0.test(i) ? 1 : 0;
 
     if (op >= 0 && op < static_cast<int>(op2LMs.size())) {
@@ -64,8 +65,7 @@ int LandmarkSumHeuristicDal::compute_edge_local_h(const State &parent_state, Ope
                 future_edge[static_cast<int>(A)] = 0;
         }
     }
-
-    // Sum costs over remaining future_edge
+    //Sum costs over remaining future_edge
     int h_edge = 0;
     for (int i = 0; i < n; ++i) {
         if (future_edge[i])
@@ -76,14 +76,17 @@ int LandmarkSumHeuristicDal::compute_edge_local_h(const State &parent_state, Ope
 
 int LandmarkSumHeuristicDal::get_heuristic_value(const State &ancestor_state) {
     int h = 0;
-    ConstBitsetView futureA =
-        lm_status_manager_action.get_future_action_landmarks(ancestor_state);
+    ConstBitsetView pastA   = lm_status_manager_action.get_past_action_landmarks(ancestor_state);
+    ConstBitsetView futureA = lm_status_manager_action.get_future_action_landmarks(ancestor_state);
     const int n = static_cast<int>(transformer.action_lm_graph.get_num_action_lms());
     for (int id = 0; id < n; ++id) {
         if (!futureA.test(id))
             continue;
-
-        const int c = min_costs_per_action_lm[id];
+        const int c = pastA.test(id)
+            ? min_possible_costs_per_action_lm[id]
+            : min_costs_per_action_lm[id];
+        if (c == std::numeric_limits<int>::max()) return DEAD_END;
+        //const int c = min_costs_per_action_lm[id];
         h += c;
     }
     return h;
@@ -167,3 +170,4 @@ static plugins::FeaturePlugin<LandmarkSumHeuristicDalFeature> _plugin;
 //./fast-downward.py misc/tests/benchmarks/miconic/s1-0.pddl --search "astar(lm_sum_action(lm_rhw(use_orders=true)))"
 //./fast-downward.py misc/tests/benchmarks/miconic/s1-0.pddl --search "astar(lm_sum_action(lm_reasonable_orders_hps(lm_rhw())))"
 //./fast-downward.py misc/tests/benchmarks/miconic/s1-0.pddl --search "lazy_greedy([lm_sum_action(lm_zg(use_orders=true))])"
+//./fast-downward.py ../downward-benchmarks/miconic/s5-3.pddl --search "lazy_greedy([lm_sum_action(lm_zg(use_orders=true))])"

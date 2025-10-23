@@ -6,6 +6,7 @@
 #include "transformer.h"
 #include "../task_utils/successor_generator.h"
 #include "../task_utils/task_properties.h"
+#include <unordered_set>
 
 
 namespace landmarks {
@@ -20,8 +21,8 @@ private:
 
   // Cached per-action-landmark minimal operator cost.
   // Indexed by action-LM node id.
-  std::vector<int> min_costs_per_action_lm;
-
+  std::vector<int> min_costs_per_action_lm;//over actions (first achievers)
+  std::vector<int> min_possible_costs_per_action_lm;  // over possible_achievers
   void initialize_costs();
   
   // Track the best (smallest) h-value we've seen so far

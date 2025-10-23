@@ -25,9 +25,9 @@ class LandmarkFactory;
 
 class ActionLandmark {
 public:
-    std::vector<int> actions; //operator IDs
+    std::vector<int> actions; //operator IDs (first achievers)
+    std::unordered_set<int> possible_achievers;
     ActionLandmark(std::vector<int> op_IDs): actions(std::move(op_IDs)) {}
-
 };
 
 class ActionLandmarkNode {
@@ -100,7 +100,9 @@ public:
     const TaskProxy &get_task_proxy() const { return task_proxy; }
 
     void compute_min_costs();// min cost per action-LM node (indexed by node id)
-    
+    void compute_min_possible_costs();// min possible cost per action-LM node (indexed by node id)
+    int get_min_cost_of_achievers(const std::unordered_set<int> &achievers) const;
+
     void discard_all_orderings();
 
     int get_min_cost_per_action_lm(const ActionLandmarkNode &actionNode) const {
@@ -108,7 +110,7 @@ public:
     }
     //get min cost for each action LM in lm_action_graph (indexed by action_node_id)
     std::vector<int> get_min_cost() const {return min_cost;}
-    
+    std::vector<int> get_min_possible_cost() const {return possible_min_cost;}
 
 private:
     std::shared_ptr<LandmarkGraph> lm_graph;
@@ -119,7 +121,7 @@ private:
     
     std::unordered_map<int, int> bank_cost;//store all ops from action LM graph and its cost: op_id -> operator cost
     std::vector<int> min_cost;//min cost for each action LM in lm_action_graph (indexed by action_node_id)
-
+    std::vector<int> possible_min_cost;//min possible cost for each action LM in lm_action_graph (indexed by action_node_id)
     void setup_costs();
 
     //if there is order between two fact lm nodes, then add same order between their action lm nodes

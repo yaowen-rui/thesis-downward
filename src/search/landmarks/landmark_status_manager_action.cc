@@ -134,22 +134,22 @@ void LandmarkStatusManagerAction::progress(
     BitsetView future1 = get_future_action_landmarks(state);
 
     for (size_t i = 0; i < num_action_lms; ++i) {
-        // Intersection for past
-        if (!past_edge[i] && past1.test(i)) {
-            past1.reset(i);
+        // // Intersection for past
+        // if (!past_edge[i] && past1.test(i)) {
+        //     past1.reset(i);
+        // }
+        // // Union for future
+        // if (future_edge[i] && !future1.test(i)) {
+        //     future1.set(i);
+        // }
+        //OR for past
+       if (past_edge[i]) {
+            past1.set(i);
         }
-        // Union for future
-        if (future_edge[i] && !future1.test(i)) {
-            future1.set(i);
+        // AND for future
+        if (!future_edge[i] && future1.test(i)) {
+            future1.reset(i);
         }
-        // OR for past
-    //    if (past_edge[i]) {
-    //         past1.set(i);
-    //     }
-    //     // AND for future
-    //     if (!future_edge[i] && future1.test(i)) {
-    //         future1.reset(i);
-    //     }
     }
 }
 
